@@ -6,11 +6,13 @@ import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import { checkUser } from "@/lib/checkUser";
 import Image from "next/image";
 
+import { ThemeModeToggle } from "./theme-mode-toggle";
+
 const Header = async () => {
   await checkUser();
 
   return (
-    <header className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b">
+    <header className="fixed top-0 w-full bg-white/80 dark:bg-background/80 backdrop-blur-md z-50 border-b">
       <nav className="container mx-auto px-4 py-4 flex items-center justify-between">
         <Link href="/">
           <Image
@@ -39,6 +41,7 @@ const Header = async () => {
 
         {/* Action Buttons */}
         <div className="flex items-center space-x-4">
+          <ThemeModeToggle />
           <SignedIn>
             <Link
               href="/dashboard"

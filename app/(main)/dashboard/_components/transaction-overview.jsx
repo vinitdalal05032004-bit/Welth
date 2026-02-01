@@ -23,13 +23,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const COLORS = [
-  "#FF6B6B",
-  "#4ECDC4",
-  "#45B7D1",
-  "#96CEB4",
-  "#FFEEAD",
-  "#D4A5A5",
-  "#9FA8DA",
+  "#FF6B6B", // Red
+  "#4ECDC4", // Teal
+  "#45B7D1", // Blue
+  "#96CEB4", // Green
+  "#FFEEAD", // Yellow
+  "#D4A5A5", // Pink
+  "#9FA8DA", // Lavender
+  "#FF9F1C", // Orange
+  "#2EC4B6", // Cyan
+  "#E71D36", // Rose
+  "#FFD93D", // Gold
+  "#6C5CE7", // Purple
+  "#A8E6CF", // Mint
+  "#FD79A8", // Hot Pink
+  "#0984E3", // Bright Blue
+  "#00B894", // Jungle Green
+  "#FDCB6E", // Mustard
+  "#E17055", // Burnt Orange
+  "#636E72", // Grey
+  "#F8EFBA", // Pale Yellow
 ];
 
 export function DashboardOverview({ accounts, transactions }) {
@@ -47,14 +60,17 @@ export function DashboardOverview({ accounts, transactions }) {
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 5);
 
-  // Calculate expense breakdown for current month
+  // Calculate expense breakdown for last 30 days
   const currentDate = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
   const currentMonthExpenses = accountTransactions.filter((t) => {
     const transactionDate = new Date(t.date);
     return (
       t.type === "EXPENSE" &&
-      transactionDate.getMonth() === currentDate.getMonth() &&
-      transactionDate.getFullYear() === currentDate.getFullYear()
+      transactionDate >= thirtyDaysAgo &&
+      transactionDate <= currentDate
     );
   });
 
@@ -134,7 +150,7 @@ export function DashboardOverview({ accounts, transactions }) {
                       ) : (
                         <ArrowUpRight className="mr-1 h-4 w-4" />
                       )}
-                      ${transaction.amount.toFixed(2)}
+                      ₹{transaction.amount.toFixed(2)}
                     </div>
                   </div>
                 </div>
@@ -148,7 +164,7 @@ export function DashboardOverview({ accounts, transactions }) {
       <Card>
         <CardHeader>
           <CardTitle className="text-base font-normal">
-            Monthly Expense Breakdown
+            Expense Breakdown (Last 30 Days)
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0 pb-5">
@@ -167,7 +183,9 @@ export function DashboardOverview({ accounts, transactions }) {
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, value }) => `${name}: $${value.toFixed(2)}`}
+                    label={({ name, percent }) =>
+                      percent > 0.05 ? `${name}` : null
+                    }
                   >
                     {pieChartData.map((entry, index) => (
                       <Cell
@@ -177,7 +195,7 @@ export function DashboardOverview({ accounts, transactions }) {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value) => `$${value.toFixed(2)}`}
+                    formatter={(value) => `₹${value.toFixed(2)}`}
                     contentStyle={{
                       backgroundColor: "hsl(var(--popover))",
                       border: "1px solid hsl(var(--border))",

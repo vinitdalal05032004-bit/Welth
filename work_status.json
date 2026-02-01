@@ -1,0 +1,22 @@
+{
+  "workAccount": {
+    "id": "4e6bf5aa-247f-4104-ad5d-dd17cf690a36",
+    "name": "Work",
+    "type": "SAVINGS",
+    "balance": "3509.1",
+    "isDefault": true,
+    "userId": "6cee7505-ca93-480d-9118-55af965d65e6",
+    "createdAt": "2025-12-12T09:16:31.091Z",
+    "updatedAt": "2026-02-01T18:51:03.251Z"
+  },
+  "userId": "6cee7505-ca93-480d-9118-55af965d65e6",
+  "budget": {
+    "id": "d9d346ca-6cf5-4768-860b-8723bedf1416",
+    "amount": "5000",
+    "userId": "6cee7505-ca93-480d-9118-55af965d65e6",
+    "createdAt": "2025-12-12T11:28:49.322Z",
+    "updatedAt": "2026-02-01T14:16:38.235Z",
+    "lastAlertSent": "2026-02-01T14:16:38.233Z"
+  },
+  "totalExpenses": "6045.39999999999999"
+}

@@ -23,26 +23,18 @@ export async function getCurrentBudget(accountId) {
       },
     });
 
-    // Get current month's expenses
+    // Get expenses for the last 30 days
     const currentDate = new Date();
-    const startOfMonth = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth(),
-      1
-    );
-    const endOfMonth = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth() + 1,
-      0
-    );
+    const startOfPeriod = new Date();
+    startOfPeriod.setDate(currentDate.getDate() - 30);
 
     const expenses = await db.transaction.aggregate({
       where: {
         userId: user.id,
         type: "EXPENSE",
         date: {
-          gte: startOfMonth,
-          lte: endOfMonth,
+          gte: startOfPeriod,
+          lte: currentDate,
         },
         accountId,
       },

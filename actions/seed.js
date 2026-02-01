@@ -3,107 +3,211 @@
 import { db } from "@/lib/prisma";
 import { subDays } from "date-fns";
 
-const ACCOUNT_ID = "account-id";
-const USER_ID = "user-id";
-
-// Categories with their typical amount ranges
 const CATEGORIES = {
   INCOME: [
-    { name: "salary", range: [5000, 8000] },
-    { name: "freelance", range: [1000, 3000] },
-    { name: "investments", range: [500, 2000] },
-    { name: "other-income", range: [100, 1000] },
+    { name: "salary", range: [4000, 5000], isRecurring: true },
+    { name: "freelance", range: [1000, 3000], isRecurring: false },
+    { name: "investments", range: [500, 2000], isRecurring: false },
+    { name: "other-income", range: [100, 1000], isRecurring: false },
   ],
   EXPENSE: [
-    { name: "housing", range: [1000, 2000] },
-    { name: "transportation", range: [100, 500] },
-    { name: "groceries", range: [200, 600] },
-    { name: "utilities", range: [100, 300] },
-    { name: "entertainment", range: [50, 200] },
-    { name: "food", range: [50, 150] },
-    { name: "shopping", range: [100, 500] },
-    { name: "healthcare", range: [100, 1000] },
-    { name: "education", range: [200, 1000] },
-    { name: "travel", range: [500, 2000] },
+    // Essentials
+    { name: "housing", range: [1000, 1500], isRecurring: true },
+    { name: "transportation", range: [50, 200], isRecurring: true },
+    { name: "groceries", range: [100, 300], isRecurring: true },
+    { name: "utilities", range: [50, 150], isRecurring: true },
+    { name: "healthcare", range: [50, 300], isRecurring: false },
+    // Lifestyle
+    { name: "dining-out", range: [20, 100], isRecurring: false },
+    { name: "shopping", range: [50, 500], isRecurring: false },
+    { name: "entertainment", range: [20, 200], isRecurring: false },
+    { name: "travel", range: [200, 800], isRecurring: false },
+    { name: "fitness", range: [30, 80], isRecurring: true },
+    { name: "subscriptions", range: [10, 50], isRecurring: true },
+    { name: "education", range: [50, 300], isRecurring: false },
+    { name: "gadgets", range: [100, 1000], isRecurring: false },
+    { name: "gifts", range: [20, 100], isRecurring: false },
   ],
 };
 
-// Helper to generate random amount within a range
 function getRandomAmount(min, max) {
   return Number((Math.random() * (max - min) + min).toFixed(2));
 }
 
-// Helper to get random category with amount
-function getRandomCategory(type) {
+function getRandomCategory(type, excludeCategories = []) {
   const categories = CATEGORIES[type];
-  const category = categories[Math.floor(Math.random() * categories.length)];
+  const availableCategories = categories.filter(
+    (c) => !excludeCategories.includes(c.name)
+  );
+
+  // Fallback if all are excluded, though unlikely in this use case
+  const pool = availableCategories.length > 0 ? availableCategories : categories;
+
+  const category = pool[Math.floor(Math.random() * pool.length)];
   const amount = getRandomAmount(category.range[0], category.range[1]);
   return { category: category.name, amount };
 }
 
 export async function seedTransactions() {
   try {
-    // Generate 90 days of transactions
+    const user = await db.user.findFirst();
+    if (!user) {
+      return { success: false, error: "No user found. Please sign in first." };
+    }
+
+    const account = await db.account.findFirst({
+      where: { userId: user.id },
+    });
+
+    if (!account) {
+      return { success: false, error: "No account found. Please create an account first." };
+    }
+
+    // Clear existing transactions to ensure clean data for the chart
+    await db.transaction.deleteMany({
+      where: { accountId: account.id },
+    });
+
+    // 1. Set a Default Budget
+    // Default budget amount - User requested realistic values
+    const BUDGET_AMOUNT = 5000;
+
+    // Create or update budget
+    await db.budget.upsert({
+      where: { userId: user.id },
+      update: { amount: BUDGET_AMOUNT },
+      create: {
+        userId: user.id,
+        amount: BUDGET_AMOUNT,
+      }
+    });
+
+    // 2. Generate Expenses to hit ~90% of Budget
+    const TARGET_EXPENSE = BUDGET_AMOUNT * 0.90; // 4500
+    let currentExpense = 0;
     const transactions = [];
-    let totalBalance = 0;
 
-    for (let i = 90; i >= 0; i--) {
-      const date = subDays(new Date(), i);
+    // Force inclusion of at least one transaction from EACH expense category
+    // This ensures the pie chart has maximum slices/diversity
+    const expenseCategories = CATEGORIES.EXPENSE;
 
-      // Generate 1-3 transactions per day
-      const transactionsPerDay = Math.floor(Math.random() * 3) + 1;
+    for (const catConfig of expenseCategories) {
+      // Stop if we already hit the target (unlikely with small initial amounts)
+      if (currentExpense >= TARGET_EXPENSE) break;
 
-      for (let j = 0; j < transactionsPerDay; j++) {
-        // 40% chance of income, 60% chance of expense
-        const type = Math.random() < 0.4 ? "INCOME" : "EXPENSE";
-        const { category, amount } = getRandomCategory(type);
+      const type = "EXPENSE";
+      const category = catConfig.name;
+      // Take a smaller random amount to leave room for others
+      const minAmt = Math.min(catConfig.range[0], 50);
+      const maxAmt = Math.min(catConfig.range[1], 150);
 
-        const transaction = {
+      let amount = getRandomAmount(minAmt, maxAmt);
+
+      if (currentExpense + amount > TARGET_EXPENSE) {
+        amount = TARGET_EXPENSE - currentExpense;
+      }
+
+      if (amount > 0) {
+        currentExpense += amount;
+        const daysAgo = Math.floor(Math.random() * 30);
+        const date = subDays(new Date(), daysAgo);
+
+        transactions.push({
           id: crypto.randomUUID(),
           type,
-          amount,
-          description: `${
-            type === "INCOME" ? "Received" : "Paid for"
-          } ${category}`,
+          amount: Number(amount.toFixed(2)),
+          description: `Payment for ${category}`,
           date,
           category,
           status: "COMPLETED",
-          userId: USER_ID,
-          accountId: ACCOUNT_ID,
+          userId: user.id,
+          accountId: account.id,
           createdAt: date,
           updatedAt: date,
-        };
-
-        totalBalance += type === "INCOME" ? amount : -amount;
-        transactions.push(transaction);
+        });
       }
     }
 
-    // Insert transactions in batches and update account balance
-    await db.$transaction(async (tx) => {
-      // Clear existing transactions
-      await tx.transaction.deleteMany({
-        where: { accountId: ACCOUNT_ID },
-      });
+    // Now fill the remaining budget with random categories
+    // Exclude 'housing' from random filler to prevent oversized slices
+    while (currentExpense < TARGET_EXPENSE) {
+      const type = "EXPENSE";
+      const { category, amount: rawAmount } = getRandomCategory(type, ["housing"]);
 
-      // Insert new transactions
-      await tx.transaction.createMany({
-        data: transactions,
-      });
+      let amount = rawAmount;
+      if (currentExpense + amount > TARGET_EXPENSE) {
+        amount = TARGET_EXPENSE - currentExpense;
+      }
 
-      // Update account balance
-      await tx.account.update({
-        where: { id: ACCOUNT_ID },
-        data: { balance: totalBalance },
+      if (amount < 2) break;
+
+      currentExpense += amount;
+
+      const daysAgo = Math.floor(Math.random() * 30);
+      const date = subDays(new Date(), daysAgo);
+
+      transactions.push({
+        id: crypto.randomUUID(),
+        type,
+        amount: Number(amount.toFixed(2)),
+        description: `Payment for ${category}`,
+        date,
+        category,
+        status: "COMPLETED",
+        userId: user.id,
+        accountId: account.id,
+        createdAt: date,
+        updatedAt: date,
       });
+    }
+
+    // 3. Add Some Income to balance it out (so balance isn't negative)
+    // Add income slightly more than target expense so they have savings
+    const TOTAL_INCOME = TARGET_EXPENSE * 1.2;
+    let currentIncome = 0;
+
+    while (currentIncome < TOTAL_INCOME) {
+      const type = "INCOME";
+      const { category, amount: rawAmount } = getRandomCategory(type);
+      const amount = rawAmount; // Keep raw random for income
+
+      currentIncome += amount;
+      const daysAgo = Math.floor(Math.random() * 30);
+      const date = subDays(new Date(), daysAgo);
+
+      transactions.push({
+        id: crypto.randomUUID(),
+        type,
+        amount: Number(amount.toFixed(2)),
+        description: `Received ${category}`,
+        date,
+        category,
+        status: "COMPLETED",
+        userId: user.id,
+        accountId: account.id,
+        createdAt: date,
+        updatedAt: date,
+      });
+    }
+
+    // Insert transactions
+    await db.transaction.createMany({
+      data: transactions,
+    });
+
+    // Update account balance
+    const finalBalance = currentIncome - currentExpense;
+    await db.account.update({
+      where: { id: account.id },
+      data: { balance: finalBalance },
     });
 
     return {
       success: true,
-      message: `Created ${transactions.length} transactions`,
+      message: `Database seeded! Budget set to ₹${BUDGET_AMOUNT}. Expenses generated: ₹${currentExpense.toFixed(2)} (${((currentExpense / BUDGET_AMOUNT) * 100).toFixed(1)}%). Created ${transactions.length} transactions.`,
     };
   } catch (error) {
     console.error("Error seeding transactions:", error);
     return { success: false, error: error.message };
   }
-}
+}    
